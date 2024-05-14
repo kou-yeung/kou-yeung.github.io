@@ -1,9 +1,9 @@
 const cacheName = "DefaultCompany-WebGLInput-0.1";
 const contentToCache = [
     "Build/WebGL.loader.js",
-    "Build/WebGL.framework.js.gz",
-    "Build/WebGL.data.gz",
-    "Build/WebGL.wasm.gz",
+    "Build/WebGL.framework.js.unityweb",
+    "Build/WebGL.data.unityweb",
+    "Build/WebGL.wasm.unityweb",
     "TemplateData/style.css"
 
 ];
