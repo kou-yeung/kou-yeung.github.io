@@ -8123,10 +8123,17 @@ BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
             return;
         }
         var arraybuffer = this.response;
-
-        var gz = new zlib.Zlib.Gunzip(new Uint8Array(arraybuffer));
-        var typed_array = gz.decompress();
-        callback(null, typed_array.buffer);
+        var contentEncoding = xhr.getResponseHeader("Content-Encoding");
+        // https://github.com/hexenq/kuroshiro/issues/27
+        // maybe auto decompress .gz in response
+        if (contentEncoding == "gzip") {
+            callback(null, arraybuffer);
+        }
+        else {
+            var gz = new zlib.Zlib.Gunzip(new Uint8Array(arraybuffer));
+            var typed_array = gz.decompress();
+            callback(null, typed_array.buffer);
+        }
     };
     xhr.onerror = function (err) {
         callback(err, null);

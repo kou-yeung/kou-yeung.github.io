@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="TemplateData/style.css">
   </head>
   <body>
-    <script src="./kuromoji/build/kuromoji.js"></script>
     <div id="unity-container" class="unity-desktop">
       <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
       <div id="unity-loading-bar">
@@ -25,11 +24,6 @@
       </div>
     </div>
     <script>
-        kuromoji.builder({ dicPath: "./kuromoji/dir/" }).build(function (err, tokenizer) {
-          // tokenizer is ready
-          var path = tokenizer.tokenize("すもももももももものうち");
-          console.log(path);
-      });
 
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
@@ -114,7 +108,7 @@
               }).then((unityInstance) => {
                 loadingBar.style.display = "none";
                 fullscreenButton.onclick = () => {
-                  unityInstance.SetFullscreen(1);
+                  document.makeFullscreen('unity-container');
                 };
               }).catch((message) => {
                 alert(message);
