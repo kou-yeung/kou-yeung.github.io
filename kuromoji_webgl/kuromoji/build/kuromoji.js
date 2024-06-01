@@ -8114,8 +8114,6 @@ BrowserDictionaryLoader.prototype = Object.create(DictionaryLoader.prototype);
  * @param {BrowserDictionaryLoader~onLoad} callback Callback function
  */
 BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
-
-    console.log("loadArrayBuffer", url);
     var xhr = new XMLHttpRequest();
     xhr.open("GET", url, true);
     xhr.responseType = "arraybuffer";
@@ -8125,10 +8123,9 @@ BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
             return;
         }
         var arraybuffer = this.response;
-        var contentEncoding = xhr.getResponseHeader("Content-Encoding");
         // https://github.com/hexenq/kuroshiro/issues/27
         // maybe auto decompress .gz in response
-        if (contentEncoding == "gzip") {
+        if (xhr.getAllResponseHeaders().toLowerCase().indexOf("content-encoding") >= 0 && xhr.getResponseHeader("Content-Encoding") == "gzip") {
             callback(null, arraybuffer);
         }
         else {
