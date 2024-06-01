@@ -8114,6 +8114,8 @@ BrowserDictionaryLoader.prototype = Object.create(DictionaryLoader.prototype);
  * @param {BrowserDictionaryLoader~onLoad} callback Callback function
  */
 BrowserDictionaryLoader.prototype.loadArrayBuffer = function (url, callback) {
+
+    console.log("loadArrayBuffer", url);
     var xhr = new XMLHttpRequest();
     xhr.open("GET", url, true);
     xhr.responseType = "arraybuffer";
