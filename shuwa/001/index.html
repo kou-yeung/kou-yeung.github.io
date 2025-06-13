@@ -1,0 +1,153 @@
+<body style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0;">
+    <label id="sub-label" style="font-size: 4rem; color: blue;">種類</label>
+    <label id="main-label" style="font-size: 12rem;">お題</label>
+    <button id="next-btn" style="font-size: 2rem; margin-top: 2rem;">次へ</button>
+    <script>
+        const tokyo23ku = [
+            "千代田区",
+            "中央区",
+            "港区",
+            "新宿区",
+            "文京区",
+            "台東区",
+            "墨田区",
+            "江東区",
+            "品川区",
+            "目黒区",
+            "大田区",
+            "世田谷区",
+            "渋谷区",
+            "中野区",
+            "杉並区",
+            "豊島区",
+            "北区",
+            "荒川区",
+            "板橋区",
+            "練馬区",
+            "足立区",
+            "葛飾区",
+            "江戸川区"];
+        const city = [
+            "八王子市",
+            "立川市",
+            "武蔵野市",
+            "三鷹市",
+            "青梅市",
+            "府中市",
+            "昭島市",
+            "調布市",
+            "町田市",
+            "小金井市",
+            "小平市",
+            "日野市",
+            "東村山市",
+            "国分寺市",
+            "国立市",
+            "福生市",
+            "狛江市",
+            "東大和市",
+            "清瀬市",
+            "東久留米市",
+            "武蔵村山市",
+            "多摩市",
+            "稲城市",
+            "羽村市",
+            "あきる野市",
+            "西東京市"
+        ];
+        const nakanos = [
+            "丸山",
+            "江原町",
+            "江古田",
+            "鷺宮",
+            "若宮",
+            "松が丘",
+            "沼袋",
+            "上高田",
+            "上鷺宮",
+            "新井",
+            "大和町",
+            "中央",
+            "中野",
+            "東中野",
+            "南台",
+            "白鷺",
+            "本町",
+            "野方",
+            "弥生町"
+        ];
+        const times = [];
+        const days = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"];
+        const ymd = [];
+        const zodiac = ["子（ねずみ）", "丑（うし）", "寅（とら）", "卯（うさぎ）", "辰（たつ）", "巳（へび）", "午（うま）", "未（ひつじ）", "申（さる）", "酉（とり）", "戌（いぬ）", "亥（いのしし）"];
+
+        const label = document.getElementById("main-label");
+        const subLabel = document.getElementById("sub-label");
+        const nextBtn = document.getElementById("next-btn");
+        const lastResults = []; // 直近3つの結果を保存
+
+        nextBtn.addEventListener("click", () => {
+            Next();
+        });
+
+        // Enterキーで抽選
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                Next();
+            }
+        });
+
+        function Next()
+        {
+            const types = [tokyo23ku, city, nakanos, times, days, ymd, zodiac];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+
+            if(randomType == times) {
+                // 時間のランダム生成
+                const ampm = Math.random() < 0.5 ? "午前" : "午後";
+                const hour = String(Math.floor(Math.random() * 12));//.padStart(2, '0');
+                const minute = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+                label.textContent = `${ampm} ${hour}時${minute}分`;
+                subLabel.textContent = GetTypeName(randomType);
+            }
+            else if(randomType == ymd) {
+                // 日付のランダム生成
+                const year = Math.floor(Math.random() * 100) + 1950; // 1950年から2050年まで
+                const month = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
+                const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0'); // 28日まで
+                label.textContent = `${year}年${month}月${day}日`;
+                subLabel.textContent = GetTypeName(randomType);
+            }
+            else {
+                subLabel.textContent = GetTypeName(randomType);
+                let randomValue;
+                let retry = 0;
+                do {
+                    randomValue = randomType[Math.floor(Math.random() * randomType.length)];
+                    retry++;
+                    // 10回リトライしても出なければ諦める
+                    if (retry > 10) break;
+                } while (lastResults.includes(randomValue));
+
+                label.textContent = randomValue;
+            }
+
+            // キャッシュ更新
+            lastResults.unshift(randomValue);
+            if (lastResults.length > 3) lastResults.pop();
+        }
+
+        function GetTypeName(type) {
+            if (type === tokyo23ku) return "東京都23区";
+            if (type === nakanos) return "中野区";
+            if (type === city) return "東京都市";
+            if (type === times) return "時間";
+            if (type === days) return "曜日";
+            if (type === ymd) return "日付";
+            if (type === zodiac) return "干支";
+            return "不明なタイプ";
+        }
+
+        Next(); // 初回実行
+    </script>
+</body>
