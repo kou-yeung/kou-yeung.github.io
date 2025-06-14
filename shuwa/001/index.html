@@ -80,11 +80,24 @@
         const days = ["月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日", "日曜日"];
         const ymd = [];
         const zodiac = ["子（ねずみ）", "丑（うし）", "寅（とら）", "卯（うさぎ）", "辰（たつ）", "巳（へび）", "午（うま）", "未（ひつじ）", "申（さる）", "酉（とり）", "戌（いぬ）", "亥（いのしし）"];
-
+        const colors = ["赤", "青", "緑", "黄色", "紫", "オレンジ", "ピンク", "茶色", "黒", "白"];
+        const yen = [];
+        const prefectures = [
+            "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+            "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "山梨県", "長野県",
+            "新潟県", "富山県", "石川県", "福井県", 
+            "岐阜県", "静岡県", "愛知県", "三重県",
+            "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県",
+            "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+            "徳島県", "香川県", "愛媛県", "高知県",
+            "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県",
+            "沖縄県"
+        ];
         const label = document.getElementById("main-label");
         const subLabel = document.getElementById("sub-label");
         const nextBtn = document.getElementById("next-btn");
         const lastResults = []; // 直近3つの結果を保存
+        let lastType = null; // 直前のタイプ
 
         nextBtn.addEventListener("click", () => {
             Next();
@@ -97,30 +110,63 @@
             }
         });
 
+        // types配列をオブジェクト形式で重み(weight)を指定
+        const types = [
+            { arr: tokyo23ku, weight: 30 },  // 東京都23区
+            { arr: city, weight: 30 },       // 東京都市
+            { arr: nakanos, weight: 30 },    // 中野区
+            { arr: times, weight: 20 },      // 時間
+            { arr: days, weight: 20 },       // 曜日
+            { arr: ymd, weight: 20 },        // 日付
+            { arr: colors, weight: 20 },       // 色
+            { arr: yen, weight: 20 },            // 円
+            { arr: prefectures, weight: 10 },     // 都道府県
+            { arr: zodiac, weight: 10 },      // 干支
+        ];
+
+        // 重みに従ってランダム選択する関数
+        function weightedRandomType() {
+            const availableTypes = types.filter(t => t.arr !== lastType);
+            const total = availableTypes.reduce((sum, t) => sum + t.weight, 0);
+            let r = Math.random() * total;
+            for (const t of availableTypes) {
+                if (r < t.weight) return t.arr;
+                r -= t.weight;
+            }
+            return availableTypes[0].arr; // fallback
+        }
+
         function Next()
         {
-            const types = [tokyo23ku, city, nakanos, times, days, ymd, zodiac];
-            const randomType = types[Math.floor(Math.random() * types.length)];
+            const randomType = weightedRandomType();
+            lastType = randomType;
 
+            let randomValue;
             if(randomType == times) {
                 // 時間のランダム生成
-                const ampm = Math.random() < 0.5 ? "午前" : "午後";
-                const hour = String(Math.floor(Math.random() * 12));//.padStart(2, '0');
-                const minute = String(Math.floor(Math.random() * 60)).padStart(2, '0');
+                const randomTime = GetRandomTime();
+                const ampm = randomTime.getHours() < 12 ? "午前" : "午後";
+                const hour = String(randomTime.getHours()).padStart(2, '0');
+                const minute = String(randomTime.getMinutes()).padStart(2, '0');
                 label.textContent = `${ampm} ${hour}時${minute}分`;
                 subLabel.textContent = GetTypeName(randomType);
             }
             else if(randomType == ymd) {
                 // 日付のランダム生成
-                const year = Math.floor(Math.random() * 100) + 1950; // 1950年から2050年まで
-                const month = String(Math.floor(Math.random() * 12) + 1).padStart(2, '0');
-                const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, '0'); // 28日まで
+                const randomTime = GetRandomTime();
+                const year = randomTime.getFullYear();
+                const month = String(randomTime.getMonth() + 1).padStart(2, '0');
+                const day = String(randomTime.getDate()).padStart(2, '0');
                 label.textContent = `${year}年${month}月${day}日`;
+                subLabel.textContent = GetTypeName(randomType);
+            }
+            else if (randomType === yen) {
+                const amount = Math.floor(Math.random() * 100000) + 1000; // 1000〜10万円
+                label.textContent = `${amount.toLocaleString('ja-JP')}円`;
                 subLabel.textContent = GetTypeName(randomType);
             }
             else {
                 subLabel.textContent = GetTypeName(randomType);
-                let randomValue;
                 let retry = 0;
                 do {
                     randomValue = randomType[Math.floor(Math.random() * randomType.length)];
@@ -145,9 +191,27 @@
             if (type === days) return "曜日";
             if (type === ymd) return "日付";
             if (type === zodiac) return "干支";
+            if (type === colors) return "色";
+            if (type === yen) return "数";
+            if (type === prefectures) return "都道府県";
             return "不明なタイプ";
         }
 
+        function GetRandomTime() {
+            // 開始日時と終了日時をDateオブジェクトで作成
+            const start = new Date(1950, 0, 1, 0, 0);
+            const end = new Date(2050, 11, 31, 23, 59);
+
+            // ミリ秒で範囲を取得
+            const startMs = start.getTime();
+            const endMs = end.getTime();
+
+            // ランダムなミリ秒値を生成
+            const randomMs = startMs + Math.random() * (endMs - startMs);
+
+            // ランダムな日時をDateオブジェクトに変換
+            return new Date(randomMs);
+      }
         Next(); // 初回実行
     </script>
 </body>
