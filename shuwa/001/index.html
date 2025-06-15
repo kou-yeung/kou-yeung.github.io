@@ -2,6 +2,7 @@
     <label id="sub-label" style="font-size: 4rem; color: blue;">種類</label>
     <label id="main-label" style="font-size: 12rem;">お題</label>
     <button id="next-btn" style="font-size: 2rem; margin-top: 2rem;">次へ</button>
+    <div id="countdown" style="font-size: 6rem; color: rgb(0, 0, 0); margin: 2rem 0;">30</div>
     <script>
         const tokyo23ku = [
             "千代田区",
@@ -96,17 +97,23 @@
         const label = document.getElementById("main-label");
         const subLabel = document.getElementById("sub-label");
         const nextBtn = document.getElementById("next-btn");
+        const countdownElem = document.getElementById('countdown');
         const lastResults = []; // 直近3つの結果を保存
         let lastType = null; // 直前のタイプ
+        const COUNTDOWN_SECONDS = 30;
+        let countdown = COUNTDOWN_SECONDS;
+        let timer = null;
 
         nextBtn.addEventListener("click", () => {
             Next();
+            startCountdown(); // 抽選時にカウントダウン再スタート
         });
 
         // Enterキーで抽選
         document.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 Next();
+                startCountdown(); // Enterキーでも再スタート
             }
         });
 
@@ -212,6 +219,32 @@
             // ランダムな日時をDateオブジェクトに変換
             return new Date(randomMs);
       }
+
+        function updateCountdownDisplay() {
+            // 強制的に再描画
+            countdownElem.textContent = countdown.toString();
+        }
+
+        function startCountdown() {
+            if (timer) clearTimeout(timer);
+            countdown = COUNTDOWN_SECONDS;
+            updateCountdownDisplay();
+            timer = setTimeout(tickCountdown, 1000);
+        }
+
+        function tickCountdown() {
+            countdown--;
+            updateCountdownDisplay();
+            if (countdown > 0) {
+                timer = setTimeout(tickCountdown, 1000);
+            } else {
+                countdown = 0;
+                updateCountdownDisplay();
+            }
+        }
+
         Next(); // 初回実行
+        updateCountdownDisplay(); // 初回表示を明示的に呼ぶ
+        startCountdown(); // 初回カウントダウン開始
     </script>
 </body>
