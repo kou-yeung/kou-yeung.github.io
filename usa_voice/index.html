@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>うさぎセリフ集</title>
+  <!-- ...existing code... -->
+</head>
+<body>
+  <!-- ...existing code... -->
+  <h1>うさぎセリフ集</h1>
+  <label for="serif-select">セリフを選択:</label>
+  <select id="serif-select">
+    <option value="おはようございます">おはようございます</option>
+    <option value="おはよう、今日も頑張ろうね">おはよう、今日も頑張ろうね</option>
+    <option value="おはよう、まだちょっと眠いです">おはよう、まだちょっと眠いです</option>
+    <option value="こんにちは！今日のお昼は何を食べましたか？">こんにちは！今日のお昼は何を食べましたか？</option>
+    <option value="こんにちは！これからもよろしくお願いします">こんにちは！これからもよろしくお願いします</option>
+    <option value="お疲れさまでした！今日も一日よく頑張りました">お疲れさまでした！今日も一日よく頑張りました</option>
+    <option value="お疲れ様～ゆっくり休んでね">お疲れ様～ゆっくり休んでね</option>
+    <option value="ただいま、帰ってきたよ。おかえりって言ってほしいね">ただいま、帰ってきたよ。おかえりって言ってほしいね</option>
+    <option value="ありがとう">ありがとう</option>
+    <option value="いつも助けてくれてありがとう">いつも助けてくれてありがとう</option>
+    <option value="また会おうね">また会おうね</option>
+    <option value="本当にありがとう">本当にありがとう</option>
+    <option value="今日は朝から少し肌寒かったです">今日は朝から少し肌寒かったです</option>
+  </select>
+  <br>
+  <label>
+    <input type="checkbox" id="noise-reduction">
+    ノイズ除去
+  </label>
+  <br>
+  <button id="play-btn">再生</button>
+  <audio id="audio-player" controls style="display:none;"></audio>
+  <script>
+    // ...existing code...
+    document.getElementById('play-btn').addEventListener('click', function() {
+      const select = document.getElementById('serif-select');
+      const noiseReduction = document.getElementById('noise-reduction').checked;
+      const audio = document.getElementById('audio-player');
+      let fileName = select.value + '.mp3';
+      let dir = noiseReduction ? 'ノイズ除去あり' : 'ノイズ除去なし';
+      audio.src = './' + dir + '/' + fileName;
+      audio.style.display = 'block';
+      audio.play();
+    });
+    // ...existing code...
+  </script>
+  <!-- ...existing code... -->
+</body>
+</html>
