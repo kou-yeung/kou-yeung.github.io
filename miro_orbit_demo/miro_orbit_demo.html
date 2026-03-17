@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Miro Orbit Demo</title>
+<style>
+  :root{
+    --bg:#f4f0e8;
+    --ink:#111;
+    --red:#ef3b2d;
+    --blue:#2e73d8;
+    --yellow:#f4c20d;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .wrap{
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  h1{
+    margin: 0 0 8px;
+    font-size: 34px;
+    letter-spacing: .04em;
+  }
+  .sub{
+    margin: 0 0 16px;
+    opacity: .8;
+  }
+  .layout{
+    display:grid;
+    grid-template-columns: minmax(300px, 820px) 240px;
+    gap: 16px;
+    align-items:start;
+  }
+  @media (max-width: 900px){
+    .layout{grid-template-columns: 1fr;}
+  }
+  .panel{
+    background: rgba(255,255,255,.55);
+    border: 4px solid var(--ink);
+    border-radius: 24px;
+    padding: 14px;
+    box-shadow: 0 6px 0 rgba(0,0,0,.08);
+  }
+  canvas{
+    width:100%;
+    aspect-ratio: 16 / 9;
+    display:block;
+    background: var(--bg);
+    border: 4px solid var(--ink);
+    border-radius: 20px;
+    touch-action:none;
+  }
+  .sidebar h2{
+    margin: 4px 0 8px;
+    font-size: 20px;
+  }
+  .stat{
+    font-size: 18px;
+    margin: 8px 0;
+  }
+  .pill{
+    display:inline-block;
+    padding: 8px 14px;
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    background:#fff;
+    font-weight:700;
+    margin: 4px 6px 4px 0;
+  }
+  button{
+    width:100%;
+    padding: 12px 14px;
+    font-size: 16px;
+    font-weight: 700;
+    border: 4px solid var(--ink);
+    border-radius: 999px;
+    background: #fff;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  button:hover{transform: translateY(-1px);}
+  .small{
+    font-size: 14px;
+    line-height: 1.6;
+    opacity: .9;
+  }
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-top:8px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Miro Orbit Demo</h1>
+  <p class="sub">黒い目玉プレイヤーで星を集める、ミロ風の抽象アクションデモ。</p>
+
+  <div class="layout">
+    <div class="panel">
+      <canvas id="game" width="960" height="540" aria-label="game canvas"></canvas>
+    </div>
+
+    <div class="panel sidebar">
+      <h2>遊び方</h2>
+      <div class="small">
+        マウス / 指でプレイヤーを誘導。<br>
+        <strong>黄色い星</strong>を集めると得点とコンボが増えます。<br>
+        <strong>黒いノイズ</strong>に当たるとコンボが切れます。<br>
+        60秒で終了です。
+      </div>
+
+      <div class="legend">
+        <span class="pill">星 = +100</span>
+        <span class="pill">連続取得 = コンボ</span>
+        <span class="pill">ノイズ = コンボ切れ</span>
+      </div>
+
+      <div class="stat" id="scoreView">Score: 0</div>
+      <div class="stat" id="comboView">Combo: x1</div>
+      <div class="stat" id="timeView">Time: 60</div>
+
+      <button id="startBtn">スタート / リスタート</button>
+      <div class="small" style="margin-top:10px;">
+        ポイント：<br>
+        ・少し揺れる操作感<br>
+        ・原色の爆発演出<br>
+        ・抽象線が漂う背景
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+
+  const scoreView = document.getElementById('scoreView');
+  const comboView = document.getElementById('comboView');
+  const timeView = document.getElementById('timeView');
+  const startBtn = document.getElementById('startBtn');
+
+  const W = canvas.width;
+  const H = canvas.height;
+
+  const COLORS = {
+    bg: '#f4f0e8',
+    ink: '#111111',
+    red: '#ef3b2d',
+    blue: '#2e73d8',
+    yellow: '#f4c20d'
+  };
+  const burstPalette = [COLORS.red, COLORS.blue, COLORS.yellow, COLORS.ink];
+
+  let running = false;
+  let score = 0;
+  let combo = 1;
+  let timeLeft = 60;
+  let lastTime = 0;
+  let timerAcc = 0;
+  let spawnAcc = 0;
+  let noiseAcc = 0;
+  let overMessage = '';
+
+  const pointer = { x: W*0.35, y: H*0.55, active: false };
+
+  const player = {
+    x: W * 0.35,
+    y: H * 0.55,
+    vx: 0,
+    vy: 0,
+    r: 16,
+    trail: []
+  };
+
+  const stars = [];
+  const noises = [];
+  const particles = [];
+  const floatDots = [];
+  const backgroundLines = [
+    { y: 90, amp: 18, speed: 0.0017, phase: 0.3, thick: 3 },
+    { y: 140, amp: 14, speed: 0.0012, phase: 2.1, thick: 2 },
+    { y: 410, amp: 20, speed: 0.0015, phase: 1.3, thick: 3 }
+  ];
+
+  for (let i = 0; i < 16; i++) {
+    floatDots.push({
+      x: Math.random()*W,
+      y: Math.random()*H,
+      r: 5 + Math.random()*15,
+      vx: -0.15 + Math.random()*0.3,
+      vy: -0.08 + Math.random()*0.16,
+      color: [COLORS.ink, COLORS.red, COLORS.blue, COLORS.yellow][Math.floor(Math.random()*4)],
+      alpha: 0.9
+    });
+  }
+
+  function resetGame() {
+    running = true;
+    score = 0;
+    combo = 1;
+    timeLeft = 60;
+    timerAcc = 0;
+    spawnAcc = 0;
+    noiseAcc = 0;
+    overMessage = '';
+    stars.length = 0;
+    noises.length = 0;
+    particles.length = 0;
+    player.x = W * 0.35;
+    player.y = H * 0.55;
+    player.vx = 0;
+    player.vy = 0;
+    player.trail.length = 0;
+    pointer.x = player.x;
+    pointer.y = player.y;
+
+    for (let i = 0; i < 4; i++) spawnStar();
+    for (let i = 0; i < 3; i++) spawnNoise();
+
+    updateHud();
+  }
+
+  function updateHud() {
+    scoreView.textContent = `Score: ${score}`;
+    comboView.textContent = `Combo: x${combo}`;
+    timeView.textContent = `Time: ${Math.max(0, Math.ceil(timeLeft))}`;
+  }
+
+  function rand(min, max) { return Math.random()*(max-min)+min; }
+
+  function spawnStar() {
+    stars.push({
+      x: rand(60, W-60),
+      y: rand(70, H-60),
+      r: rand(18, 28),
+      pulse: Math.random()*Math.PI*2
+    });
+  }
+
+  function spawnNoise() {
+    noises.push({
+      x: rand(50, W-50),
+      y: rand(50, H-50),
+      r: rand(14, 24),
+      vx: rand(-0.7, 0.7),
+      vy: rand(-0.5, 0.5),
+      seed: Math.random()*Math.PI*2
+    });
+  }
+
+  function spawnBurst(x, y, power=1) {
+    const count = 10 + power * 5;
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = rand(1.5, 4.5 + power*0.8);
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * rand(1.2, 4.2 + power),
+        vy: Math.sin(a) * rand(1.2, 4.2 + power),
+        life: rand(22, 38),
+        maxLife: 38,
+        size: rand(5, 18) * s * 0.22,
+        color: burstPalette[Math.floor(Math.random()*burstPalette.length)],
+        kind: Math.random() < 0.7 ? 'drop' : 'dot'
+      });
+    }
+  }
+
+  function dist(ax, ay, bx, by) {
+    return Math.hypot(ax - bx, ay - by);
+  }
+
+  function update(dt, t) {
+    if (!running) return;
+
+    timerAcc += dt;
+    spawnAcc += dt;
+    noiseAcc += dt;
+
+    if (timerAcc >= 1) {
+      timeLeft -= Math.floor(timerAcc);
+      timerAcc %= 1;
+      if (timeLeft <= 0) {
+        timeLeft = 0;
+        running = false;
+        overMessage = 'TIME UP';
+      }
+      updateHud();
+    }
+
+    if (spawnAcc > 1.1 && stars.length < 6) {
+      spawnAcc = 0;
+      spawnStar();
+    }
+
+    if (noiseAcc > 2.0 && noises.length < 5) {
+      noiseAcc = 0;
+      if (Math.random() < 0.7) spawnNoise();
+    }
+
+    const tx = pointer.x + Math.sin(t * 0.006) * 10;
+    const ty = pointer.y + Math.cos(t * 0.008) * 8;
+
+    const ax = (tx - player.x) * 2.9;
+    const ay = (ty - player.y) * 2.9;
+
+    player.vx += ax * dt;
+    player.vy += ay * dt;
+    player.vx *= 0.87;
+    player.vy *= 0.87;
+    player.x += player.vx * dt * 60;
+    player.y += player.vy * dt * 60;
+
+    player.x = Math.max(20, Math.min(W-20, player.x));
+    player.y = Math.max(20, Math.min(H-20, player.y));
+
+    player.trail.push({ x: player.x, y: player.y });
+    if (player.trail.length > 18) player.trail.shift();
+
+    for (const d of floatDots) {
+      d.x += d.vx;
+      d.y += d.vy;
+      if (d.x < -30) d.x = W + 30;
+      if (d.x > W + 30) d.x = -30;
+      if (d.y < -30) d.y = H + 30;
+      if (d.y > H + 30) d.y = -30;
+    }
+
+    for (const n of noises) {
+      n.x += n.vx;
+      n.y += n.vy;
+      if (n.x < 25 || n.x > W-25) n.vx *= -1;
+      if (n.y < 25 || n.y > H-25) n.vy *= -1;
+    }
+
+    for (let i = stars.length - 1; i >= 0; i--) {
+      const s = stars[i];
+      s.pulse += dt * 4;
+      if (dist(player.x, player.y, s.x, s.y) < player.r + s.r * 0.7) {
+        score += 100 * combo;
+        combo = Math.min(12, combo + 1);
+        spawnBurst(s.x, s.y, combo);
+        stars.splice(i, 1);
+        spawnStar();
+        updateHud();
+      }
+    }
+
+    for (const n of noises) {
+      if (dist(player.x, player.y, n.x, n.y) < player.r + n.r * 0.9) {
+        combo = 1;
+        spawnBurst(player.x, player.y, 1);
+        n.x = rand(50, W-50);
+        n.y = rand(50, H-50);
+        updateHud();
+      }
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.985;
+      p.vy *= 0.985;
+      p.life--;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawStar(x, y, r, fill) {
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const outer = -Math.PI / 2 + i * Math.PI * 2 / 5;
+      const inner = outer + Math.PI / 5;
+      const ox = x + Math.cos(outer) * r;
+      const oy = y + Math.sin(outer) * r;
+      const ix = x + Math.cos(inner) * r * 0.45;
+      const iy = y + Math.sin(inner) * r * 0.45;
+      if (i === 0) ctx.moveTo(ox, oy);
+      else ctx.lineTo(ox, oy);
+      ctx.lineTo(ix, iy);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineWidth = 4;
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  function drawDrop(x, y, size, angle, color, alpha) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.quadraticCurveTo(size * 0.9, -size * 0.2, size * 0.55, size * 0.9);
+    ctx.quadraticCurveTo(0, size * 0.5, -size * 0.55, size * 0.9);
+    ctx.quadraticCurveTo(-size * 0.9, -size * 0.2, 0, -size);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawBackground(t) {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // big symbolic circles
+    ctx.fillStyle = COLORS.red;
+    ctx.beginPath();
+    ctx.arc(130, 110, 48, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = COLORS.blue;
+    ctx.beginPath();
+    ctx.arc(640, 95, 22, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = COLORS.yellow;
+    ctx.beginPath();
+    ctx.arc(220, 430, 34, 0, Math.PI*2);
+    ctx.fill();
+
+    // floating dots
+    for (const d of floatDots) {
+      ctx.save();
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = d.color;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // background curves
+    ctx.strokeStyle = COLORS.ink;
+    ctx.lineCap = 'round';
+    for (const line of backgroundLines) {
+      ctx.lineWidth = line.thick;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 16) {
+        const y = line.y + Math.sin(x * 0.02 + t * line.speed + line.phase) * line.amp;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // thick black shape
+    ctx.beginPath();
+    ctx.moveTo(720, 300);
+    ctx.bezierCurveTo(760, 260, 840, 250, 950, 290);
+    ctx.bezierCurveTo(900, 310, 810, 338, 720, 300);
+    ctx.fillStyle = COLORS.ink;
+    ctx.fill();
+  }
+
+  function drawScene(t) {
+    drawBackground(t);
+
+    // trail
+    if (player.trail.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(player.trail[0].x, player.trail[0].y);
+      for (let i = 1; i < player.trail.length; i++) {
+        const p = player.trail[i];
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // stars
+    for (const s of stars) {
+      const rr = s.r + Math.sin(s.pulse) * 2;
+      drawStar(s.x, s.y, rr, COLORS.yellow);
+    }
+
+    // noises
+    for (const n of noises) {
+      ctx.save();
+      ctx.translate(n.x, n.y);
+      ctx.rotate(Math.sin(t * 0.003 + n.seed) * 0.6);
+      ctx.fillStyle = COLORS.ink;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, n.r * 1.05, n.r * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(n.r * 0.8, 0);
+      ctx.lineTo(n.r * 1.7, -4);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(-n.r*0.15, -2, n.r*0.22, 0, Math.PI*2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(-n.r*0.1, -1, n.r*0.09, 0, Math.PI*2);
+      ctx.fillStyle = COLORS.ink;
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // particles
+    for (const p of particles) {
+      const alpha = Math.max(0, p.life / p.maxLife);
+      if (p.kind === 'drop') {
+        drawDrop(p.x, p.y, p.size, Math.atan2(p.vy, p.vx) + Math.PI/2, p.color, alpha);
+      } else {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 0.5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // player
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(Math.atan2(player.vy, player.vx) * 0.15);
+    ctx.fillStyle = COLORS.ink;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 20, 16, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(18, 0);
+    ctx.lineTo(31, -3);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = COLORS.ink;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(-3, -1, 7, 0, Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(-1, 0, 3, 0, Math.PI*2);
+    ctx.fillStyle = COLORS.ink;
+    ctx.fill();
+    ctx.restore();
+
+    // HUD overlay in canvas
+    ctx.fillStyle = COLORS.ink;
+    ctx.font = '700 22px system-ui';
+    ctx.fillText(`SCORE ${score}`, 24, 34);
+    ctx.fillText(`x${combo}`, 24, 62);
+
+    if (!running && overMessage) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(244,240,232,0.82)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = COLORS.ink;
+      ctx.font = '700 54px system-ui';
+      ctx.fillText(overMessage, W/2, H/2 - 10);
+      ctx.font = '700 24px system-ui';
+      ctx.fillText(`最終スコア: ${score}`, W/2, H/2 + 36);
+      ctx.font = '700 18px system-ui';
+      ctx.fillText('右のボタンで再スタート', W/2, H/2 + 74);
+      ctx.restore();
+    }
+  }
+
+  function loop(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min(0.033, (ts - lastTime) / 1000);
+    lastTime = ts;
+    update(dt, ts);
+    drawScene(ts);
+    requestAnimationFrame(loop);
+  }
+
+  function pointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : e;
+    return {
+      x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+      y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const p = pointerPos(e);
+    pointer.x = p.x;
+    pointer.y = p.y;
+  });
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const p = pointerPos(e);
+    pointer.active = true;
+    pointer.x = p.x;
+    pointer.y = p.y;
+  }, { passive:false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const p = pointerPos(e);
+    pointer.x = p.x;
+    pointer.y = p.y;
+  }, { passive:false });
+
+  canvas.addEventListener('touchend', () => {
+    pointer.active = false;
+  });
+
+  canvas.addEventListener('click', e => {
+    const p = pointerPos(e);
+    pointer.x = p.x;
+    pointer.y = p.y;
+  });
+
+  startBtn.addEventListener('click', resetGame);
+
+  resetGame();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
